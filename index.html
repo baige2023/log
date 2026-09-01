@@ -405,6 +405,32 @@
   }
   .modal-ops .primary:hover { opacity: .9; }
   .modal-ops button:not(.primary):hover { border-color: var(--danger); color: var(--danger); }
+  .data-monitor {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 4px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .dm-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-2); }
+  .dm-row b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .dm-row.sub { font-size: 11.5px; color: var(--text-3); }
+  .dm-bar { height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+  .dm-fill { height: 100%; width: 0; border-radius: 999px; background: var(--primary); transition: width .4s; }
+  .dm-scale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-3); margin-top: -4px; }
+  #btnArchive { border-color: var(--border); color: var(--primary); }
+  #btnArchive:hover { border-color: var(--primary); background: rgba(37,99,235,.05); }
+  .archive-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .archive-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; font-size: 12.5px; color: var(--text-2);
+  }
+  .archive-item b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .archive-item .arc-btn {
+    flex-shrink: 0; font-size: 12px; padding: 4px 10px; border-radius: 7px;
+    border: 1px solid var(--border); color: var(--primary); background: var(--card);
+    transition: all .15s; cursor: pointer;
+  }
+  .archive-item .arc-btn:hover { border-color: var(--primary); background: rgba(37,99,235,.05); }
+  .archive-empty { font-size: 12px; color: var(--text-3); padding: 2px 2px; }
   /* 灵感板块 */
   .idea-input-card {
     background: var(--card); border: 1px solid var(--border);
@@ -625,6 +651,21 @@
       <div class="tm-group"><span class="tm-label">记录标签</span><div class="tm-list" id="tmRecord"></div></div>
       <div class="tm-group"><span class="tm-label">灵感标签</span><div class="tm-list" id="tmIdea"></div></div>
     </div>
+    <div class="modal-sec"><span>数据</span>
+      <div class="modal-sec-tip">本地与云盘同步存储，随时可归档旧数据瘦身。</div>
+    </div>
+    <div class="data-monitor">
+      <div class="dm-row"><span>当前占用</span><b id="dmSize">—</b></div>
+      <div class="dm-bar"><div class="dm-fill" id="dmLocalFill"></div></div>
+      <div class="dm-scale"><span>本地存储 0</span><span>提醒阈值</span></div>
+      <div class="dm-row"><span>按当前速度还能用</span><b id="dmEstimate">—</b></div>
+      <div class="dm-row sub"><span>云端单文件</span><b id="dmGit">100 MB</b></div>
+    </div>
+    <div class="modal-sec"><span>数据归档</span>
+      <div class="modal-sec-tip">把一年前的记录 / 灵感搬到云端的 <b>archive-&lt;年份&gt;.json</b>，本地立即瘦身，历史仍在云端可见。</div>
+    </div>
+    <div class="modal-ops"><button id="btnArchive">归档一年前的数据</button></div>
+    <div class="archive-list" id="archiveList"></div>
     <div class="modal-sec"><span>云端同步</span></div>
     <div class="modal-tip">
       数据保存在你的<b>私有</b> GitHub 仓库的一个 JSON 文件里，多端打开自动同步。<br><br>
@@ -875,6 +916,150 @@
   }
   function toast(msg, ms) { showToast(msg, null, null, ms); }
   function toastAction(msg, label, fn, ms) { showToast(msg, label, fn, ms); }
+  /* ================= 数据体积监测与归档 ================= */
+  var LOCAL_LIMIT = 5 * 1048576;      // localStorage 约 5MB
+  var GITHUB_LIMIT = 100 * 1048576;   // GitHub 单文件上限约 100MB
+  function fmtSize(b) {
+    if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB';
+    if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+    return b + ' B';
+  }
+  function dataSizeBytes() {
+    try { return new Blob([JSON.stringify(data)]).size; }
+    catch (e) { return 0; }
+  }
+  // 渲染设置弹窗里的体积监测
+  function renderDataMonitor() {
+    var size = dataSizeBytes();
+    var elSize = document.getElementById('dmSize');
+    if (!elSize) return;
+    elSize.textContent = fmtSize(size);
+    var ratio = size / LOCAL_LIMIT;
+    var fill = document.getElementById('dmLocalFill');
+    fill.style.width = Math.min(100, ratio * 100) + '%';
+    fill.style.background = ratio > 0.7 ? '#dc2626' : (ratio > 0.5 ? '#d97706' : '#2563eb');
+    // 速率估算：近30天新增条数 -> 字节/天 -> 距今容量剩余时间
+    var est = document.getElementById('dmEstimate');
+    var cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+    var recent = 0, total = data.entries.length;
+    data.entries.forEach(function (e) { if (e.createdAt >= cutoff) recent++; });
+    var ideas = data.inspirations || [];
+    total += ideas.length;
+    ideas.forEach(function (e) { if (e.createdAt >= cutoff) recent++; });
+    if (recent > 0 && total > 0) {
+      var perEntry = size / total;
+      var daily = (recent / 30) * perEntry;
+      var days = daily > 0 ? (LOCAL_LIMIT - size) / daily : Infinity;
+      est.textContent = days > 3650 ? '约 ' + Math.round(days / 365) + ' 年'
+                     : (daily > 0 ? '约 ' + Math.max(0, Math.round(days)) + ' 天' : '—');
+    } else {
+      est.textContent = '—';
+    }
+    var git = document.getElementById('dmGit');
+    if (git) git.textContent = '已用 ' + fmtSize(size) + ' / ' + fmtSize(GITHUB_LIMIT);
+    fill.className = 'dm-fill' + (ratio > 0.7 ? ' warn' : '');
+  }
+  // 把一组数据推送到云端历史文件（存在则更新，不存在则创建）
+  function ghArchivePush(file, payload) {
+    var path = '/repos/' + syncCfg.owner + '/' + syncCfg.repo + '/contents/' + encodeURIComponent(file) +
+               '?ref=' + encodeURIComponent(syncCfg.branch || 'main');
+    return ghReq('GET', path).then(function (r) {
+      return r.status === 200 ? r.json() : null;
+    }).then(function (obj) {
+      var body = {
+        message: '归档 ' + file,
+        content: b64enc(JSON.stringify(payload)),
+        branch: syncCfg.branch || 'main'
+      };
+      if (obj && obj.sha) body.sha = obj.sha;
+      return ghReq('PUT', '/repos/' + syncCfg.owner + '/' + syncCfg.repo + '/contents/' + encodeURIComponent(file), body)
+        .then(function (r) {
+          if (!r.ok) return r.json().then(function (j) { throw new Error(j.message || '推送失败'); });
+          return r.json();
+        });
+    });
+  }
+  // 归档一年前的记录与灵感
+  function doArchive() {
+    if (!syncCfg) { toast('请先在下方配置云端同步'); return; }
+    var cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear() - 1);
+    var cutoffStr = fmtDate(cutoff);
+    var cutoffTs = cutoff.getTime();
+    var byYear = {}, moved = 0;
+    data.deleted = data.deleted || {};
+    var entries = data.entries.filter(function (e) {
+      if (e.date < cutoffStr) {
+        (byYear[e.date.slice(0, 4)] = byYear[e.date.slice(0, 4)] || []).push(e);
+        data.deleted[e.id] = Date.now(); moved++;
+        return false;
+      }
+      return true;
+    });
+    data.entries = entries;
+    var ideas = (data.inspirations || []).filter(function (e) {
+      var ts = e.createdAt || 0;
+      if (ts > 0 && ts < cutoffTs) {
+        (byYear[String(new Date(ts).getFullYear())] = byYear[String(new Date(ts).getFullYear())] || []).push(e);
+        data.deleted[e.id] = Date.now(); moved++;
+        return false;
+      }
+      return true;
+    });
+    data.inspirations = ideas;
+    if (!moved) { toast('没有一年前的数据需要归档'); return; }
+    if (!confirm('将 ' + moved + ' 条一年前的记录/灵感移至云端历史文件，确定继续？')) return;
+    // 已归档年份留痕，便于日后一键查看/恢复
+    var af = data.archiveFiles || (data.archiveFiles = []);
+    Object.keys(byYear).forEach(function (y) { var f = 'archive-' + y + '.json'; if (af.indexOf(f) === -1) af.push(f); });
+    var jobs = Object.keys(byYear).map(function (y) {
+      var list = byYear[y];
+      return ghArchivePush('archive-' + y + '.json', {
+        archivedAt: Date.now(), year: +y,
+        entries: list.filter(function (x) { return x.date !== undefined; }),
+        inspirations: list.filter(function (x) { return x.date === undefined; })
+      });
+    });
+    syncing = true; setSyncStatus('ing');
+    Promise.all(jobs).then(function () {
+      syncing = false;
+      saveData();          // 推送带墓碑的活跃数据，避免其他端复活
+      renderAll(); renderDataMonitor(); renderArchives();
+      setSyncStatus('ok'); toast('已归档 ' + moved + ' 条到云端历史文件');
+    }).catch(function (err) {
+      syncing = false; setSyncStatus('err'); toast('归档失败：' + err.message);
+    });
+  }
+  // 列出已归档的年份历史文件
+  function renderArchives() {
+    var listEl = document.getElementById('archiveList');
+    if (!listEl) return;
+    var af = (data.archiveFiles || []).slice().sort();
+    if (!af.length) { listEl.innerHTML = '<div class="archive-empty">暂无历史归档</div>'; return; }
+    listEl.innerHTML = af.map(function (f) {
+      return '<div class="archive-item"><b>' + escapeHtml(f) + '</b>' +
+        '<button class="arc-btn" data-arcdl="' + escapeHtml(f) + '">下载</button></div>';
+    }).join('');
+  }
+  // 从云端下载某个历史归档文件
+  function downloadArchive(file) {
+    if (!syncCfg) { toast('请先配置云端同步'); return; }
+    var path = '/repos/' + syncCfg.owner + '/' + syncCfg.repo + '/contents/' + encodeURIComponent(file) +
+               '?ref=' + encodeURIComponent(syncCfg.branch || 'main');
+    toast('正在下载 ' + file + ' …');
+    ghReq('GET', path).then(function (r) {
+      if (r.status === 404) throw new Error('云端不存在该文件');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (obj) {
+      var payload = JSON.parse(b64dec(obj.content));
+      var n = (payload.entries || []).length + (payload.inspirations || []).length;
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = file + '.backup.json'; a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      toast('已下载 ' + file + '（' + n + ' 条）');
+    }).catch(function (err) { toast('下载失败：' + err.message); });
+  }
   /* ================= 数据层 ================= */
   var data = null;
   function seedData() {
@@ -1681,9 +1866,16 @@
       document.getElementById('cfgToken').value = syncCfg.token || '';
     }
     renderTagManager();
+    renderDataMonitor();
+    renderArchives();
     syncModal.classList.add('show');
   }
   function closeSyncModal() { syncModal.classList.remove('show'); }
+  document.getElementById('btnArchive').addEventListener('click', doArchive);
+  document.getElementById('archiveList').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-arcdl]');
+    if (b) { ev.stopPropagation(); downloadArchive(b.getAttribute('data-arcdl')); }
+  });
   // 标签管理渲染
   function recordManageTags() {
     var list = allTags().slice();
