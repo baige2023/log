@@ -27,7 +27,7 @@
   html, body { height: 100%; }
   body {
     font-family: var(--font);
-    background: var(--bg);
+    background: linear-gradient(180deg, #edf1f8 0, var(--bg) 280px) fixed;
     color: var(--text);
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
@@ -89,13 +89,7 @@
     font-size: 12px; font-weight: 600; color: var(--text-2);
     letter-spacing: .5px; margin-bottom: 8px;
   }
-  .collapse-toggle {
-    width: 100%; display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 0; text-align: left;
-  }
-  .collapse-toggle .chev { transition: transform .2s; color: var(--text-3); }
-  .collapse-toggle.open .chev { transform: rotate(90deg); }
-  #statsBody { padding-top: 8px; }
+
   /* 日历 */
   .cal-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 6px; }
   .cal-title { font-size: 13px; font-weight: 600; flex: 1; text-align: center; }
@@ -151,6 +145,8 @@
   .stat-label { font-size: 12px; color: var(--text-2); }
   .stat-val { font-size: 13px; font-weight: 700; }
   .stat-val small { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 2px; }
+  .stat-bar { height: 5px; border-radius: 3px; background: var(--border-light); overflow: hidden; margin-top: 3px; }
+  .stat-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #2563eb, #60a5fa); transition: width .4s; }
   /* 底部：导入导出 + 同步 */
   .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
   .data-ops { display: flex; gap: 6px; }
@@ -214,7 +210,9 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: var(--shadow);
     padding: 9px 12px; margin-bottom: 12px;
+    transition: border-color .15s, box-shadow .15s;
   }
+  .quick-add:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   .qa-input { display: flex; align-items: center; gap: 8px; }
   .qa-input input {
     flex: 1; border: none; outline: none; font-size: 14px; background: none;
@@ -252,10 +250,33 @@
     display: flex; align-items: center; gap: 9px;
     margin: 2px 0 12px;
   }
-  .section-title { font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .4px; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .4px; display: flex; align-items: center; gap: 6px; }
+  .section-title::before { content: ''; width: 4px; height: 13px; border-radius: 2px; background: linear-gradient(180deg, #2563eb, #60a5fa); }
+  .col-idea .section-title::before { background: linear-gradient(180deg, #f59e0b, #fbbf24); }
   .section-line { flex: 1; height: 1px; background: var(--border); }
-  /* 时间轴分组 */
-  .day-group { margin-bottom: 14px; scroll-margin-top: 16px; }
+  /* 时间轴分组（左侧竖线 + 节点） */
+  #timeline { position: relative; padding-left: 26px; }
+  #timeline::before {
+    content: ''; position: absolute; left: 7px; top: 10px; bottom: 12px; width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #2563eb 0, #93c5fd 30%, #e5e7eb 92%);
+  }
+  #timeline.empty { padding-left: 0; }
+  #timeline.empty::before { display: none; }
+  .day-group { margin-bottom: 14px; scroll-margin-top: 16px; position: relative; }
+  .day-group::before {
+    content: ''; position: absolute; left: -23px; top: 6px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--card); border: 2.5px solid #93c5fd; z-index: 1;
+  }
+  .day-group.today-group::before {
+    background: var(--primary); border-color: var(--primary);
+    animation: nodePulse 2.2s ease-in-out infinite;
+  }
+  @keyframes nodePulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(37,99,235,.20); }
+    50% { box-shadow: 0 0 0 7px rgba(37,99,235,.07); }
+  }
   .day-head {
     display: flex; align-items: baseline; gap: 8px;
     padding: 0 2px 6px;
@@ -266,14 +287,18 @@
   .day-card {
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+    transition: box-shadow .2s, transform .2s;
   }
+  .day-card:hover { box-shadow: 0 5px 16px rgba(31,35,40,.08); transform: translateY(-1px); }
   .entry {
     display: flex; align-items: center; gap: 8px;
     padding: 9px 12px;
     padding-right: 38px;
     position: relative;
+    transition: background .15s;
   }
   .entry + .entry { border-top: 1px solid var(--border-light); }
+  .entry:hover { background: #fafbfe; }
   .cb {
     width: 18px; height: 18px; border-radius: 50%;
     border: 2px solid #d1d5db; flex-shrink: 0;
@@ -361,7 +386,9 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: var(--shadow);
     padding: 9px 12px; margin-bottom: 12px;
+    transition: border-color .15s, box-shadow .15s;
   }
+  .idea-input-card:focus-within { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
   .idea-input-card input {
     width: 100%; height: 26px; line-height: 26px; border: none; outline: none; font-size: 14px; background: none;
   }
@@ -376,6 +403,12 @@
     border-radius: var(--radius); padding: 11px 12px;
     display: flex; flex-direction: column; gap: 8px;
     position: relative; transition: box-shadow .15s, transform .15s;
+    overflow: hidden;
+  }
+  .idea-card::before {
+    content: ''; position: absolute; top: 0; left: 14px; right: 14px; height: 2.5px;
+    border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b); opacity: .85;
   }
   .idea-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.07); transform: translateY(-1px); }
   .idea-text { font-size: 13px; line-height: 1.6; word-break: break-all; white-space: pre-wrap; }
@@ -487,13 +520,8 @@
       <div class="tags-wrap" id="tagFilterWrap"></div>
     </div>
     <div class="panel">
-      <button class="panel-title collapse-toggle" id="statsToggle">
-        统计
-        <svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-      </button>
-      <div id="statsBody" style="display:none;">
-        <div class="stats-list" id="statsList"></div>
-      </div>
+      <div class="panel-title">统计</div>
+      <div class="stats-list" id="statsList"></div>
     </div>
     <div class="side-foot">
       <div class="data-ops">
@@ -592,7 +620,8 @@
   /* ================= 工具 ================= */
   var STORAGE_KEY = 'daily-log-data';
   var SYNC_KEY = 'daily-log-sync';
-  var PRESET_TAGS = ['工作', '学习', '生活'];
+  var PRESET_TAGS = ['工作', '学习'];       // 记录的预设标签
+  var IDEA_PRESET_TAGS = ['学习'];           // 灵感的预设标签（与记录相互独立）
   /* ================= 云端同步（GitHub 私有仓库） ================= */
   var syncCfg = null;
   try { syncCfg = JSON.parse(localStorage.getItem(SYNC_KEY)); } catch (e) {}
@@ -663,6 +692,11 @@
       if (t && tags.indexOf(t) === -1 && PRESET_TAGS.indexOf(t) === -1) tags.push(t);
     });
     data.customTags = tags;
+    var itags = (data.ideaTags || []).slice();
+    (remote.ideaTags || []).forEach(function (t) {
+      if (t && itags.indexOf(t) === -1 && IDEA_PRESET_TAGS.indexOf(t) === -1) itags.push(t);
+    });
+    data.ideaTags = itags;
     data.version = Math.max(data.version || 1, remote.version || 1);
     if (sha) { syncCfg._sha = sha; saveSyncCfg(); }
     saveLocal();
@@ -748,6 +782,30 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function escapeReg(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  /* 标签配色：工作/学习固定色，其余按名字哈希取色 */
+  var TAG_PALETTE = [
+    ['#2563eb', 'rgba(37,99,235,.10)'],
+    ['#059669', 'rgba(5,150,105,.10)'],
+    ['#d97706', 'rgba(217,119,6,.10)'],
+    ['#7c3aed', 'rgba(124,58,237,.10)'],
+    ['#db2777', 'rgba(219,39,119,.10)'],
+    ['#0891b2', 'rgba(8,145,178,.10)']
+  ];
+  function tagColor(tag) {
+    if (tag === '工作') return TAG_PALETTE[0];
+    if (tag === '学习') return TAG_PALETTE[1];
+    var h = 0;
+    for (var i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    return TAG_PALETTE[h % TAG_PALETTE.length];
+  }
+  function chipStyle(tag) {
+    var c = tagColor(tag);
+    return ' style="color:' + c[0] + ';background:' + c[1] + ';border-color:' + c[0] + '"';
+  }
+  function tagBadge(tag) {
+    var c = tagColor(tag);
+    return '<span class="entry-tag" style="color:' + c[0] + ';background:' + c[1] + '">' + escapeHtml(tag) + '</span>';
+  }
   var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
   function dateLabel(s) {
     var t = todayStr();
@@ -789,17 +847,21 @@
     return {
       version: 1,
       customTags: [],
+      ideaTags: [],
       deleted: {},
-      inspirations: [],
+      inspirations: [
+        { id: uid(), text: '把每周复盘写成固定模板，周日晚花 20 分钟填完', tags: ['学习'], createdAt: now, updatedAt: now },
+        { id: uid(), text: '写个自动整理桌面截图的小脚本', tags: [], createdAt: now - 86400000, updatedAt: now - 86400000 }
+      ],
       entries: [
         { id: uid(), date: d1, text: '完成项目周报并发送', tag: '工作', starred: true, done: true, createdAt: now, updatedAt: now },
         { id: uid(), date: d1, text: '晨读英语 30 分钟', tag: '学习', starred: false, done: true, createdAt: now, updatedAt: now },
         { id: uid(), date: d1, text: '整理明天会议的讨论提纲', tag: '工作', starred: false, done: false, createdAt: now, updatedAt: now },
         { id: uid(), date: fmtDate(d2), text: '看完《设计数据密集型应用》第 3 章', tag: '学习', starred: false, done: true, createdAt: now, updatedAt: now },
         { id: uid(), date: fmtDate(d2), text: '和设计同学对齐新版本交互稿', tag: '工作', starred: false, done: true, createdAt: now, updatedAt: now },
-        { id: uid(), date: fmtDate(d2), text: '夜跑 5 公里', tag: '生活', starred: false, done: false, createdAt: now, updatedAt: now },
+        { id: uid(), date: fmtDate(d2), text: '夜跑 5 公里', tag: '', starred: false, done: false, createdAt: now, updatedAt: now },
         { id: uid(), date: fmtDate(d3), text: '修复登录页偶现的白屏问题', tag: '工作', starred: false, done: true, createdAt: now, updatedAt: now },
-        { id: uid(), date: fmtDate(d3), text: '整理本月支出记账', tag: '生活', starred: false, done: true, createdAt: now, updatedAt: now }
+        { id: uid(), date: fmtDate(d3), text: '整理本月支出记账', tag: '', starred: false, done: true, createdAt: now, updatedAt: now }
       ]
     };
   }
@@ -810,6 +872,7 @@
         var obj = JSON.parse(raw);
         if (obj && Array.isArray(obj.entries)) {
           obj.customTags = Array.isArray(obj.customTags) ? obj.customTags : [];
+          obj.ideaTags = Array.isArray(obj.ideaTags) ? obj.ideaTags : [];
           obj.deleted = obj.deleted || {};
           obj.inspirations = Array.isArray(obj.inspirations) ? obj.inspirations : [];
           data = obj;
@@ -828,7 +891,8 @@
     saveLocal();
     schedulePush(); // 已配置云端时自动推送
   }
-  function allTags() { return PRESET_TAGS.concat(data.customTags); }
+  function allTags() { return PRESET_TAGS.concat(data.customTags); } // 记录标签池
+  function ideaAllTags() { return IDEA_PRESET_TAGS.concat(data.ideaTags || []); } // 灵感标签池（独立于记录）
   function addEntry(date, text, tag, starred) {
     var now = Date.now();
     var e = { id: uid(), date: date, text: text, tag: tag || '', starred: !!starred, done: false, createdAt: now, updatedAt: now };
@@ -863,9 +927,9 @@
     data.inspirations = data.inspirations || [];
     var e = { id: uid(), text: text, tags: tags || [], createdAt: now, updatedAt: now };
     data.inspirations.push(e);
-    // 灵感里的新标签同步进自定义标签池
+    // 灵感新标签只进灵感自己的标签池（与记录分开）
     (tags || []).forEach(function (t) {
-      if (t && allTags().indexOf(t) === -1) data.customTags.push(t);
+      if (t && ideaAllTags().indexOf(t) === -1) (data.ideaTags = data.ideaTags || []).push(t);
     });
     saveData();
     return e;
@@ -897,7 +961,6 @@
     editingId: null,
     editingIdeaId: null,
     ideaTag: '',           // 灵感视图的标签筛选
-    pendingDate: null,     // 日历点空白天后，待补录的日期
     qaTag: '',
     qaStar: false
   };
@@ -912,9 +975,8 @@
     if (state.searchKw && e.text.indexOf(state.searchKw) === -1) return false;
     return true;
   }
-  // 侧边栏全局筛选对灵感生效的部分（标签 + 关键词，状态筛选只管记录）
+  // 灵感只随关键词过滤；标签筛选已按板块分开，各管各的
   function matchIdeaGlobal(e) {
-    if (state.filterTag && (e.tags || []).indexOf(state.filterTag) === -1) return false;
     if (state.searchKw && e.text.indexOf(state.searchKw) === -1) return false;
     return true;
   }
@@ -951,7 +1013,8 @@
     var wrap = document.getElementById('tagFilterWrap');
     var html = '<button class="tag-chip' + (state.filterTag === '' ? ' active' : '') + '" data-tag="">全部</button>';
     allTags().forEach(function (tag) {
-      html += '<button class="tag-chip' + (state.filterTag === tag ? ' active' : '') + '" data-tag="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</button>';
+      var on = state.filterTag === tag;
+      html += '<button class="tag-chip' + (on ? ' active' : '') + '" data-tag="' + escapeHtml(tag) + '"' + (on ? chipStyle(tag) : '') + '>' + escapeHtml(tag) + '</button>';
     });
     wrap.innerHTML = html;
   }
@@ -968,13 +1031,16 @@
     var cutStr = fmtDate(cut);
     var recent = data.entries.filter(function (e) { return e.date >= cutStr; });
     var rate = '—';
+    var rateNum = 0;
     if (recent.length) {
-      rate = Math.round(recent.filter(function (e) { return e.done; }).length * 100 / recent.length) + '%';
+      rateNum = Math.round(recent.filter(function (e) { return e.done; }).length * 100 / recent.length);
+      rate = rateNum + '%';
     }
     document.getElementById('statsList').innerHTML =
       '<div class="stat-row"><span class="stat-label">本月记录天数</span><span class="stat-val">' + monthDays + '<small>天</small></span></div>' +
       '<div class="stat-row"><span class="stat-label">累计记录天数</span><span class="stat-val">' + totalDays + '<small>天</small></span></div>' +
-      '<div class="stat-row"><span class="stat-label">近 30 天完成率</span><span class="stat-val">' + rate + '</span></div>';
+      '<div class="stat-row"><span class="stat-label">近 30 天完成率</span><span class="stat-val">' + rate + '</span></div>' +
+      '<div class="stat-bar"><i style="width:' + rateNum + '%"></i></div>';
   }
   /* ================= 渲染：时间轴 ================= */
   function highlightText(text) {
@@ -996,12 +1062,13 @@
     return '<div class="entry' + (e.done ? ' done' : '') + '">' +
       '<button class="cb' + (e.done ? ' done' : '') + '" data-act="toggle" data-id="' + e.id + '" title="' + (e.done ? '标记为待办' : '标记为完成') + '">' + CHECK_SVG + '</button>' +
       '<span class="entry-text" data-act="edit" data-id="' + e.id + '" title="点击编辑">' + highlightText(e.text) + '</span>' +
-      (e.tag ? '<span class="entry-tag">' + escapeHtml(e.tag) + '</span>' : '') +
+      (e.tag ? tagBadge(e.tag) : '') +
       star + del + '</div>';
   }
   var CHECK_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
   function renderTimeline() {
     var tl = document.getElementById('timeline');
+    var todayDs = todayStr();
     // 分组
     var groups = {};
     data.entries.forEach(function (e) {
@@ -1009,10 +1076,9 @@
       (groups[e.date] = groups[e.date] || []).push(e);
     });
     var dates = Object.keys(groups);
-    // 日历点选空白天后，注入一个待补录的空分组
-    if (state.pendingDate && dates.indexOf(state.pendingDate) === -1) dates.push(state.pendingDate);
     dates.sort().reverse();
     if (!dates.length) {
+      tl.classList.add('empty');
       if (data.entries.length === 0) {
         tl.innerHTML = '<div class="empty-state"><div class="big">📖</div><p>还没有任何记录<br>从上面输入框开始，写下今天做的第一件事吧</p></div>';
       } else {
@@ -1020,25 +1086,19 @@
       }
       return;
     }
+    tl.classList.remove('empty');
     var html = '';
     dates.forEach(function (date) {
       var list = groups[date] || [];
-      var isPending = (state.pendingDate === date && list.length === 0);
       var doneCount = list.filter(function (e) { return e.done; }).length;
       var lb = dateLabel(date);
-      html += '<div class="day-group" id="day-' + date + '">' +
+      html += '<div class="day-group' + (date === todayDs ? ' today-group' : '') + '" id="day-' + date + '">' +
         '<div class="day-head"><span class="day-title">' + lb.text + '</span>' +
-        '<span class="day-meta">' + (isPending ? '补录中' : list.length + ' 条 · ' + doneCount + ' 完成') + '</span></div>' +
+        '<span class="day-meta">' + list.length + ' 条 · ' + doneCount + ' 完成</span></div>' +
         '<div class="day-card">';
       list.forEach(function (e) { html += entryHtml(e); });
-      if (isPending) {
-        html += '<div class="entry more-input-row" style="background:#fbfcfe;">' +
-          '<input class="edit-input" id="pendingInput" placeholder="补录「' + lb.text + '」的一条记录，回车保存…" maxlength="200">' +
-          '<button class="qa-add-btn" id="pendingSave" style="padding:4px 10px;font-size:12px;">保存</button></div>';
-      } else {
-        html += '<button class="add-more" data-act="addmore" data-date="' + date + '">' +
-          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>补录一条</button>';
-      }
+      html += '<button class="add-more" data-act="addmore" data-date="' + date + '">' +
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>补录一条</button>';
       html += '</div></div>';
     });
     tl.innerHTML = html;
@@ -1052,23 +1112,6 @@
         bindEditInput(inp);
       }
     }
-    // 日历空白日补录输入
-    var pInp = document.getElementById('pendingInput');
-    if (pInp) {
-      pInp.focus();
-      pInp.addEventListener('keydown', function (ev) {
-        if (ev.key === 'Enter') { ev.preventDefault(); savePending(pInp.value); }
-        else if (ev.key === 'Escape') { state.pendingDate = null; renderTimeline(); }
-      });
-      document.getElementById('pendingSave').addEventListener('click', function () { savePending(pInp.value); });
-    }
-  }
-  function savePending(v) {
-    var d = state.pendingDate;
-    state.pendingDate = null;
-    v = (v || '').trim();
-    if (d && v) { addEntry(d, v, state.qaTag, false); toast('已补录到 ' + dateLabel(d).text); }
-    renderAll();
   }
   function bindEditInput(inp) {
     var id = state.editingId;
@@ -1090,8 +1133,8 @@
   }
   /* ================= 渲染：灵感板块 ================= */
   function ideaFilterTags() {
-    // 全局标签池 ∪ 灵感里实际用过的标签
-    var pool = allTags().slice();
+    // 灵感自己的标签池 ∪ 灵感里实际用过的标签
+    var pool = ideaAllTags().slice();
     (data.inspirations || []).forEach(function (e) {
       (e.tags || []).forEach(function (t) { if (t && pool.indexOf(t) === -1) pool.push(t); });
     });
@@ -1101,7 +1144,8 @@
     var bar = document.getElementById('ideaTagBar');
     var html = '<button class="tag-chip' + (state.ideaTag === '' ? ' active' : '') + '" data-itag="">全部</button>';
     ideaFilterTags().forEach(function (t) {
-      html += '<button class="tag-chip' + (state.ideaTag === t ? ' active' : '') + '" data-itag="' + escapeHtml(t) + '">' + escapeHtml(t) + '</button>';
+      var on = state.ideaTag === t;
+      html += '<button class="tag-chip' + (on ? ' active' : '') + '" data-itag="' + escapeHtml(t) + '"' + (on ? chipStyle(t) : '') + '>' + escapeHtml(t) + '</button>';
     });
     bar.innerHTML = html;
   }
@@ -1110,8 +1154,7 @@
     var list = (data.inspirations || []).slice().sort(function (a, b) { return b.createdAt - a.createdAt; });
     var kw = state.searchKw;
     list = list.filter(function (e) {
-      // 侧边栏全局标签筛选对灵感同样生效
-      if (state.filterTag && (e.tags || []).indexOf(state.filterTag) === -1) return false;
+      // 灵感用自己的标签筛选；侧边栏标签只管记录
       if (state.ideaTag && (e.tags || []).indexOf(state.ideaTag) === -1) return false;
       if (kw && e.text.indexOf(kw) === -1) return false;
       return true;
@@ -1135,9 +1178,7 @@
           '<input class="edit-input" id="iedit-' + e.id + '" value="' + escapeHtml(e.text) + '" maxlength="500">' +
           '<div class="idea-foot"><span class="idea-date" style="margin-left:0;">' + ds + '</span></div></div>';
       } else {
-        var tagsHtml = (e.tags || []).map(function (t) {
-          return '<span class="entry-tag">' + escapeHtml(t) + '</span>';
-        }).join('');
+        var tagsHtml = (e.tags || []).map(function (t) { return tagBadge(t); }).join('');
         if (e.converted) tagsHtml += '<span class="idea-converted">✓ 已转记录</span>';
         html += '<div class="idea-card">' + ops +
           '<div class="idea-text" data-iact="iedit" data-id="' + e.id + '" title="点击编辑">' + highlightText(e.text) + '</div>' +
@@ -1175,7 +1216,8 @@
     var foot = document.getElementById('qaFoot');
     var html = '';
     allTags().forEach(function (tag) {
-      html += '<button class="tag-chip' + (state.qaTag === tag ? ' active' : '') + '" data-qatag="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</button>';
+      var on = state.qaTag === tag;
+      html += '<button class="tag-chip' + (on ? ' active' : '') + '" data-qatag="' + escapeHtml(tag) + '"' + (on ? chipStyle(tag) : '') + '>' + escapeHtml(tag) + '</button>';
     });
     html += '<button class="qa-newtag" id="qaNewTag"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新标签</button>';
     foot.innerHTML = html;
@@ -1191,9 +1233,13 @@
     if (state.filterStatus === 'done') parts.push('已完成');
     if (state.filterStatus === 'star') parts.push('星标');
     var count = data.entries.filter(matchEntry).length;
-    var icount = (data.inspirations || []).filter(matchIdeaGlobal).length;
-    document.getElementById('resultText').textContent =
-      '筛选：' + parts.join(' + ') + ' · 记录 ' + count + ' 条 · 灵感 ' + icount + ' 条';
+    // 标签/状态筛选只管记录；灵感数仅在有搜索词时展示
+    var txt = '筛选：' + parts.join(' + ') + ' · 记录 ' + count + ' 条';
+    if (state.searchKw) {
+      var icount = (data.inspirations || []).filter(matchIdeaGlobal).length;
+      txt += ' · 灵感 ' + icount + ' 条';
+    }
+    document.getElementById('resultText').textContent = txt;
     banner.classList.add('show');
   }
   function renderAll() {
@@ -1362,14 +1408,6 @@
   }
   document.getElementById('clearFilter').addEventListener('click', clearAllFilters);
   /* ================= 事件：日历 ================= */
-  document.getElementById('calPrev').addEventListener('click', function () {
-    state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; }
-    renderCalendar();
-  });
-  document.getElementById('calNext').addEventListener('click', function () {
-    state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; }
-    renderCalendar();
-  });
   function highlightGroup(ds) {
     var group = document.getElementById('day-' + ds);
     if (!group) return false;
@@ -1380,6 +1418,14 @@
     setTimeout(function () { card.style.boxShadow = ''; }, 900);
     return true;
   }
+  document.getElementById('calPrev').addEventListener('click', function () {
+    state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; }
+    renderCalendar();
+  });
+  document.getElementById('calNext').addEventListener('click', function () {
+    state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; }
+    renderCalendar();
+  });
   document.getElementById('calToday').addEventListener('click', function () {
     var n = new Date();
     state.calY = n.getFullYear();
@@ -1396,16 +1442,9 @@
     closeSide();
     // 若在筛选模式，先清除以保证分组已渲染
     if (isFilterMode()) clearAllFilters();
-    if (highlightGroup(ds)) {
-      // 已有记录：滚动定位 + 高亮
-      if (state.pendingDate) { state.pendingDate = null; renderTimeline(); }
-    } else {
-      // 空白日：直接生成补录输入框
-      state.pendingDate = ds;
-      renderTimeline();
-      var g = document.getElementById('day-' + ds);
-      if (g) g.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    var has = data.entries.some(function (e) { return e.date === ds; });
+    if (highlightGroup(ds)) return;
+    toast(has ? '该日记录未在当前列表中' : '这一天还没有记录');
   });
   /* ================= 导入导出 ================= */
   document.getElementById('btnExport').addEventListener('click', function () {
@@ -1446,6 +1485,9 @@
         });
         (obj.customTags || []).forEach(function (t) {
           if (t && allTags().indexOf(t) === -1) data.customTags.push(t);
+        });
+        (obj.ideaTags || []).forEach(function (t) {
+          if (t && ideaAllTags().indexOf(t) === -1) (data.ideaTags = data.ideaTags || []).push(t);
         });
         var iExistIds = {};
         (data.inspirations || []).forEach(function (e) { iExistIds[e.id] = true; });
@@ -1510,8 +1552,7 @@
       }
     } else if (act === 'torec') {
       if (!idea || idea.converted) return;
-      if (allTags().indexOf('灵感') === -1) { data.customTags.push('灵感'); }
-      var created = addEntry(todayStr(), idea.text, '灵感', false);
+      var created = addEntry(todayStr(), idea.text, '', false); // 标签体系已分开，转记录不再自动打标
       updateIdea(id, { converted: true }); // 标记已转换，防止重复转换
       renderAll();
       toastAction('已转为今日记录', '撤销', function () {
@@ -1563,13 +1604,6 @@
     closeSyncModal();
     setSyncStatus();
     toast('已清除云端配置（本地数据保留）');
-  });
-  /* ================= 统计折叠 ================= */
-  document.getElementById('statsToggle').addEventListener('click', function () {
-    var body = document.getElementById('statsBody');
-    var willOpen = body.style.display === 'none';
-    body.style.display = willOpen ? '' : 'none';
-    this.classList.toggle('open', willOpen);
   });
   /* ================= 移动端抽屉 ================= */
   var sidebarEl = document.getElementById('sidebar');
