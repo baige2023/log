@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>每日工作学习记录</title>
+<title>baige</title>
 <style>
   :root {
     --bg: #f7f8fa;
@@ -315,6 +315,53 @@
   .modal-ops .primary:hover { opacity: .9; }
   .modal-ops button:not(.primary):hover { border-color: var(--danger); color: var(--danger); }
 
+  /* 视图切换 */
+  .nav-tabs { display: flex; gap: 6px; padding: 3px; background: var(--bg); border-radius: 10px; }
+  .nav-tab {
+    flex: 1; padding: 7px 0; text-align: center; font-size: 13px;
+    border-radius: 8px; color: var(--text-2); transition: all .15s;
+  }
+  .nav-tab.active { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+  /* 灵感板块 */
+  .idea-input-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px; margin-bottom: 16px;
+  }
+  .idea-input-card input {
+    width: 100%; border: none; outline: none; font-size: 14.5px; background: none;
+  }
+  .idea-input-card input::placeholder { color: var(--text-3); }
+  .idea-input-hint { font-size: 11.5px; color: var(--text-3); margin-top: 8px; }
+  .idea-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px;
+  }
+  .idea-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+    position: relative; transition: box-shadow .15s, transform .15s;
+  }
+  .idea-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.07); transform: translateY(-1px); }
+  .idea-text { font-size: 13.5px; line-height: 1.65; word-break: break-all; white-space: pre-wrap; }
+  .idea-text mark { background: #fde68a; border-radius: 3px; padding: 0 1px; }
+  .idea-foot { display: flex; align-items: center; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+  .idea-date { font-size: 11px; color: var(--text-3); margin-left: auto; }
+  .idea-ops {
+    position: absolute; top: 8px; right: 8px; display: none; gap: 2px;
+    background: var(--card); border-radius: 7px;
+  }
+  .idea-card:hover .idea-ops { display: flex; }
+  .idea-op {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-3); font-size: 11px; transition: all .15s;
+  }
+  .idea-op:hover { background: var(--bg); color: var(--primary); }
+  .idea-op.del:hover { color: var(--danger); background: #fef2f2; }
+
   /* toast */
   #toast {
     position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -346,6 +393,11 @@
         <div class="brand-title">每日记录</div>
         <div class="brand-sub">工作 · 学习 · 生活</div>
       </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-view="log">记录</button>
+      <button class="nav-tab" data-view="idea">灵感</button>
     </div>
 
     <div class="search-box">
@@ -394,6 +446,7 @@
   <!-- ============ 主区域 ============ -->
   <main class="main">
     <div class="main-inner">
+      <div id="logView">
       <div class="filter-bar" id="filterBar">
         <button class="status-chip active" data-status="all">全部</button>
         <button class="status-chip" data-status="todo">待办</button>
@@ -421,6 +474,16 @@
       </div>
 
       <div id="timeline"></div>
+      </div><!-- /logView -->
+
+      <div id="ideaView" style="display:none;">
+        <div class="idea-input-card">
+          <input id="ideaInput" type="text" maxlength="500" placeholder="记下一个灵感，回车保存…">
+          <div class="idea-input-hint">支持 #标签 内联语法，例如：做一个记账小程序 #产品 #创意</div>
+        </div>
+        <div class="filter-bar" id="ideaTagBar"></div>
+        <div class="idea-grid" id="ideaGrid"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -521,6 +584,18 @@
 
     data.deleted = del;
     data.entries = Object.keys(map).map(function (k) { return map[k]; }).filter(function (e) {
+      var d = del[e.id];
+      return !(d && d >= (e.updatedAt || 0));
+    });
+
+    // 灵感同样按 updatedAt 合并 + 墓碑
+    var imap = {};
+    (data.inspirations || []).forEach(function (e) { imap[e.id] = e; });
+    (remote.inspirations || []).forEach(function (e) {
+      var cur = imap[e.id];
+      if (!cur || (e.updatedAt || 0) >= (cur.updatedAt || 0)) imap[e.id] = e;
+    });
+    data.inspirations = Object.keys(imap).map(function (k) { return imap[k]; }).filter(function (e) {
       var d = del[e.id];
       return !(d && d >= (e.updatedAt || 0));
     });
@@ -654,6 +729,7 @@
       version: 1,
       customTags: [],
       deleted: {},
+      inspirations: [],
       entries: [
         { id: uid(), date: d1, text: '完成项目周报并发送', tag: '工作', starred: true, done: true, createdAt: now, updatedAt: now },
         { id: uid(), date: d1, text: '晨读英语 30 分钟', tag: '学习', starred: false, done: true, createdAt: now, updatedAt: now },
@@ -675,6 +751,7 @@
         if (obj && Array.isArray(obj.entries)) {
           obj.customTags = Array.isArray(obj.customTags) ? obj.customTags : [];
           obj.deleted = obj.deleted || {};
+          obj.inspirations = Array.isArray(obj.inspirations) ? obj.inspirations : [];
           data = obj;
           return;
         }
@@ -720,14 +797,41 @@
     saveData();
   }
 
+  /* ---- 灵感 CRUD ---- */
+  function addIdea(text, tags) {
+    var now = Date.now();
+    data.inspirations = data.inspirations || [];
+    data.inspirations.push({ id: uid(), text: text, tags: tags || [], createdAt: now, updatedAt: now });
+    // 灵感里的新标签同步进自定义标签池
+    (tags || []).forEach(function (t) {
+      if (t && allTags().indexOf(t) === -1) data.customTags.push(t);
+    });
+    saveData();
+  }
+  function updateIdea(id, patch) {
+    (data.inspirations || []).forEach(function (e) {
+      if (e.id === id) { for (var k in patch) e[k] = patch[k]; e.updatedAt = Date.now(); }
+    });
+    saveData();
+  }
+  function deleteIdea(id) {
+    data.deleted = data.deleted || {};
+    data.deleted[id] = Date.now();
+    data.inspirations = (data.inspirations || []).filter(function (e) { return e.id !== id; });
+    saveData();
+  }
+
   /* ================= 应用状态 ================= */
   var state = {
+    view: 'log',           // log | idea
     calY: new Date().getFullYear(),
     calM: new Date().getMonth(),
     searchKw: '',
     filterTag: '',
     filterStatus: 'all',   // all | todo | done | star
     editingId: null,
+    editingIdeaId: null,
+    ideaTag: '',           // 灵感视图的标签筛选
     qaTag: '',
     qaStar: false
   };
@@ -909,6 +1013,89 @@
     renderAll();
   }
 
+  /* ================= 渲染：灵感板块 ================= */
+  function ideaFilterTags() {
+    // 全局标签池 ∪ 灵感里实际用过的标签
+    var pool = allTags().slice();
+    (data.inspirations || []).forEach(function (e) {
+      (e.tags || []).forEach(function (t) { if (t && pool.indexOf(t) === -1) pool.push(t); });
+    });
+    return pool;
+  }
+
+  function renderIdeaTagBar() {
+    var bar = document.getElementById('ideaTagBar');
+    var html = '<button class="tag-chip' + (state.ideaTag === '' ? ' active' : '') + '" data-itag="">全部</button>';
+    ideaFilterTags().forEach(function (t) {
+      html += '<button class="tag-chip' + (state.ideaTag === t ? ' active' : '') + '" data-itag="' + escapeHtml(t) + '">' + escapeHtml(t) + '</button>';
+    });
+    bar.innerHTML = html;
+  }
+
+  function renderIdeas() {
+    var grid = document.getElementById('ideaGrid');
+    var list = (data.inspirations || []).slice().sort(function (a, b) { return b.createdAt - a.createdAt; });
+    var kw = state.searchKw;
+    list = list.filter(function (e) {
+      if (state.ideaTag && (e.tags || []).indexOf(state.ideaTag) === -1) return false;
+      if (kw && e.text.indexOf(kw) === -1) return false;
+      return true;
+    });
+
+    if (!list.length) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="big">💡</div><p>' +
+        ((data.inspirations || []).length ? '没有匹配的灵感' : '还没有灵感<br>灵光一闪时，在上面记下来') + '</p></div>';
+      return;
+    }
+
+    var html = '';
+    list.forEach(function (e) {
+      var d = new Date(e.createdAt);
+      var ds = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+      var ops = '<div class="idea-ops">' +
+        '<button class="idea-op" data-iact="torec" data-id="' + e.id + '" title="转为今日记录"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg></button>' +
+        '<button class="idea-op del" data-iact="idel" data-id="' + e.id + '" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
+        '</div>';
+      if (state.editingIdeaId === e.id) {
+        html += '<div class="idea-card">' +
+          '<input class="edit-input" id="iedit-' + e.id + '" value="' + escapeHtml(e.text) + '" maxlength="500">' +
+          '<div class="idea-foot"><span class="idea-date" style="margin-left:0;">' + ds + '</span></div></div>';
+      } else {
+        var tagsHtml = (e.tags || []).map(function (t) {
+          return '<span class="entry-tag">' + escapeHtml(t) + '</span>';
+        }).join('');
+        html += '<div class="idea-card">' + ops +
+          '<div class="idea-text" data-iact="iedit" data-id="' + e.id + '" title="点击编辑">' + highlightText(e.text) + '</div>' +
+          '<div class="idea-foot">' + tagsHtml + '<span class="idea-date">' + ds + '</span></div></div>';
+      }
+    });
+    grid.innerHTML = html;
+
+    if (state.editingIdeaId) {
+      var inp = document.getElementById('iedit-' + state.editingIdeaId);
+      if (inp) {
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+        var id = state.editingIdeaId;
+        inp.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); commitIdeaEdit(id, inp.value); }
+          else if (ev.key === 'Escape') { state.editingIdeaId = null; renderIdeas(); }
+        });
+        inp.addEventListener('blur', function () {
+          if (state.editingIdeaId === id) commitIdeaEdit(id, inp.value);
+        });
+      }
+    }
+  }
+
+  function commitIdeaEdit(id, val) {
+    val = val.trim();
+    state.editingIdeaId = null;
+    if (val) updateIdea(id, { text: val });
+    else deleteIdea(id);
+    renderAll();
+  }
+
   /* ================= 渲染：快速添加 & 结果横幅 ================= */
   function renderQuickAdd() {
     var foot = document.getElementById('qaFoot');
@@ -942,7 +1129,13 @@
     renderQuickAdd();
     renderBanner();
     renderTimeline();
+    renderIdeaTagBar();
+    renderIdeas();
     document.getElementById('quickAdd').style.display = isFilterMode() ? 'none' : '';
+    var isIdea = state.view === 'idea';
+    document.getElementById('logView').style.display = isIdea ? 'none' : '';
+    document.getElementById('ideaView').style.display = isIdea ? '' : 'none';
+    document.getElementById('searchInput').placeholder = isIdea ? '搜索灵感…' : '搜索记录…';
   }
 
   /* ================= 事件：时间轴（委托） ================= */
@@ -1165,6 +1358,16 @@
         (obj.customTags || []).forEach(function (t) {
           if (t && allTags().indexOf(t) === -1) data.customTags.push(t);
         });
+        var iExistIds = {};
+        (data.inspirations || []).forEach(function (e) { iExistIds[e.id] = true; });
+        (obj.inspirations || []).forEach(function (e) {
+          if (e && e.id && !iExistIds[e.id] && e.text) {
+            data.inspirations.push({
+              id: e.id, text: String(e.text), tags: Array.isArray(e.tags) ? e.tags : [],
+              createdAt: e.createdAt || Date.now(), updatedAt: e.updatedAt || Date.now()
+            });
+          }
+        });
         saveData();
         renderAll();
         toast(added ? '导入成功，新增 ' + added + ' 条' : '没有新记录（可能已导入过）');
@@ -1173,6 +1376,65 @@
       }
     };
     reader.readAsText(file);
+  });
+
+  /* ================= 事件：灵感板块 ================= */
+  document.querySelector('.nav-tabs').addEventListener('click', function (ev) {
+    var tab = ev.target.closest('[data-view]');
+    if (!tab) return;
+    state.view = tab.getAttribute('data-view');
+    document.querySelectorAll('.nav-tab').forEach(function (t) {
+      t.classList.toggle('active', t.getAttribute('data-view') === state.view);
+    });
+    renderAll();
+  });
+
+  document.getElementById('ideaInput').addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter') return;
+    var raw = this.value.trim();
+    if (!raw) return;
+    // 解析 #标签 内联语法
+    var tags = [];
+    var text = raw.replace(/#([^\s#]+)/g, function (m, t) { if (tags.indexOf(t) === -1) tags.push(t); return ''; }).trim();
+    if (!text) { toast('请填写灵感内容'); return; }
+    addIdea(text, tags);
+    this.value = '';
+    renderAll();
+  });
+
+  document.getElementById('ideaTagBar').addEventListener('click', function (ev) {
+    var chip = ev.target.closest('[data-itag]');
+    if (!chip) return;
+    var tag = chip.getAttribute('data-itag');
+    state.ideaTag = (state.ideaTag === tag) ? '' : tag;
+    renderIdeaTagBar();
+    renderIdeas();
+  });
+
+  document.getElementById('ideaGrid').addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-iact]');
+    if (!el) return;
+    var act = el.getAttribute('data-iact');
+    var id = el.getAttribute('data-id');
+    var idea = (data.inspirations || []).find(function (e) { return e.id === id; });
+
+    if (act === 'iedit') {
+      state.editingIdeaId = id;
+      renderIdeas();
+    } else if (act === 'idel') {
+      if (!idea) return;
+      if (confirm('确定删除这条灵感吗？\n\n「' + (idea.text.length > 30 ? idea.text.slice(0, 30) + '…' : idea.text) + '」')) {
+        deleteIdea(id);
+        renderAll();
+        toast('已删除');
+      }
+    } else if (act === 'torec') {
+      if (!idea) return;
+      if (allTags().indexOf('灵感') === -1) { data.customTags.push('灵感'); }
+      addEntry(todayStr(), idea.text, '灵感', false);
+      renderAll();
+      toast('已转为今日记录');
+    }
   });
 
   /* ================= 事件：云端同步设置 ================= */
