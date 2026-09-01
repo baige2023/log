@@ -370,6 +370,30 @@
     transition: border-color .15s;
   }
   .modal input:focus { border-color: var(--primary); }
+  .modal-sec {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 700; color: var(--text);
+    margin: 14px 0 8px;
+  }
+  .modal-sec::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .modal-sec:first-of-type { margin-top: 0; }
+  .modal-sec-tip { font-size: 12px; font-weight: 400; color: var(--text-3); line-height: 1.6; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; margin-top: -4px; }
+  .tag-manage { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+  .tm-group { display: flex; align-items: flex-start; gap: 8px; }
+  .tm-label { font-size: 11.5px; color: var(--text-2); width: 58px; flex-shrink: 0; line-height: 24px; }
+  .tm-list { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+  .tm-chip {
+    display: inline-flex; align-items: center; gap: 2px;
+    font-size: 12px; padding: 1px 4px 1px 9px; border-radius: 999px;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-2);
+  }
+  .tm-chip .tm-del {
+    width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--text-3); transition: all .15s;
+  }
+  .tm-chip .tm-del:hover { color: var(--danger); background: #fef2f2; }
+  .tm-empty { font-size: 12px; color: var(--text-3); line-height: 24px; }
   .modal-ops { display: flex; gap: 8px; margin-top: 14px; }
   .modal-ops button {
     flex: 1; padding: 8px 0; border-radius: 8px; font-size: 13px;
@@ -588,10 +612,20 @@
 </div>
 <div class="side-mask" id="sideMask"></div>
 <div id="toast"></div>
-<!-- 云端同步设置弹窗 -->
+<!-- 设置弹窗 -->
 <div class="modal-mask" id="syncModal">
   <div class="modal">
-    <div class="modal-title">云端同步设置</div>
+    <div class="modal-title">设置</div>
+    <!-- 标签管理 -->
+    <div class="modal-sec">
+      <span>标签管理</span>
+      <div class="modal-sec-tip">删除标签会同时清掉所有使用它的记录 / 灵感。预设标签（工作、学习）也可以删除。</div>
+    </div>
+    <div class="tag-manage">
+      <div class="tm-group"><span class="tm-label">记录标签</span><div class="tm-list" id="tmRecord"></div></div>
+      <div class="tm-group"><span class="tm-label">灵感标签</span><div class="tm-list" id="tmIdea"></div></div>
+    </div>
+    <div class="modal-sec"><span>云端同步</span></div>
     <div class="modal-tip">
       数据保存在你的<b>私有</b> GitHub 仓库的一个 JSON 文件里，多端打开自动同步。<br><br>
       <b>Token 创建方法</b>：github.com → Settings → Developer settings → Fine-grained tokens → Generate，Repository access 只选你的私有数据仓库，权限只勾 <b>Contents: Read and write</b>。
@@ -697,6 +731,11 @@
       if (t && itags.indexOf(t) === -1 && IDEA_PRESET_TAGS.indexOf(t) === -1) itags.push(t);
     });
     data.ideaTags = itags;
+    var ht = (data.hiddenTags || []).slice();
+    (remote.hiddenTags || []).forEach(function (t) {
+      if (t && ht.indexOf(t) === -1) ht.push(t);
+    });
+    data.hiddenTags = ht;
     data.version = Math.max(data.version || 1, remote.version || 1);
     if (sha) { syncCfg._sha = sha; saveSyncCfg(); }
     saveLocal();
@@ -848,6 +887,7 @@
       version: 1,
       customTags: [],
       ideaTags: [],
+      hiddenTags: [],   // 用户删除的标签（含预设标签），不再回到池子
       deleted: {},
       inspirations: [
         { id: uid(), text: '把每周复盘写成固定模板，周日晚花 20 分钟填完', tags: ['学习'], createdAt: now, updatedAt: now },
@@ -873,6 +913,7 @@
         if (obj && Array.isArray(obj.entries)) {
           obj.customTags = Array.isArray(obj.customTags) ? obj.customTags : [];
           obj.ideaTags = Array.isArray(obj.ideaTags) ? obj.ideaTags : [];
+          obj.hiddenTags = Array.isArray(obj.hiddenTags) ? obj.hiddenTags : [];
           obj.deleted = obj.deleted || {};
           obj.inspirations = Array.isArray(obj.inspirations) ? obj.inspirations : [];
           data = obj;
@@ -891,8 +932,22 @@
     saveLocal();
     schedulePush(); // 已配置云端时自动推送
   }
-  function allTags() { return PRESET_TAGS.concat(data.customTags); } // 记录标签池
-  function ideaAllTags() { return IDEA_PRESET_TAGS.concat(data.ideaTags || []); } // 灵感标签池（独立于记录）
+  function allTags() { // 记录标签池：未删除的预设 + 自定义
+    var hidden = data.hiddenTags || (data.hiddenTags = []);
+    var list = (data.customTags || []).slice();
+    PRESET_TAGS.forEach(function (t) {
+      if (hidden.indexOf(t) === -1 && list.indexOf(t) === -1) list.unshift(t);
+    });
+    return list;
+  }
+  function ideaAllTags() { // 灵感标签池（独立于记录）：未删除的预设 + 自定义
+    var hidden = data.hiddenTags || (data.hiddenTags = []);
+    var list = (data.ideaTags || []).slice();
+    IDEA_PRESET_TAGS.forEach(function (t) {
+      if (hidden.indexOf(t) === -1 && list.indexOf(t) === -1) list.unshift(t);
+    });
+    return list;
+  }
   function addEntry(date, text, tag, starred) {
     var now = Date.now();
     var e = { id: uid(), date: date, text: text, tag: tag || '', starred: !!starred, done: false, createdAt: now, updatedAt: now };
@@ -1393,6 +1448,51 @@
     syncStatusChips();
     renderAll();
   });
+  /* 删除记录标签：连带清空使用它的记录，支持撤销 */
+  function findIdea(id) {
+    for (var i = 0; i < (data.inspirations || []).length; i++) if (data.inspirations[i].id === id) return data.inspirations[i];
+    return null;
+  }
+  function deleteRecordTag(tag) {
+    var hidden = data.hiddenTags || (data.hiddenTags = []);
+    var backup = { tag: tag, entries: [] };
+    data.entries.forEach(function (e) {
+      if (e.tag === tag) { backup.entries.push({ id: e.id, form: e.tag || '' }); e.tag = ''; }
+    });
+    var isPreset = PRESET_TAGS.indexOf(tag) !== -1;
+    if (isPreset) { if (hidden.indexOf(tag) === -1) hidden.push(tag); }
+    else { var i = data.customTags.indexOf(tag); if (i > -1) data.customTags.splice(i, 1); }
+    if (state.filterTag === tag) state.filterTag = '';
+    if (state.qaTag === tag) state.qaTag = '';
+    saveData();
+    renderAll();
+    renderTagManager();
+    toastAction('已删除标签「' + tag + '」' + (backup.entries.length ? '，' + backup.entries.length + ' 条记录已清空该标签' : ''), '撤销', function () {
+      if (isPreset) { var h = data.hiddenTags.indexOf(tag); if (h > -1) data.hiddenTags.splice(h, 1); }
+      else { if (data.customTags.indexOf(tag) === -1) data.customTags.push(tag); }
+      backup.entries.forEach(function (b) { var e = findEntry(b.id); if (e) e.tag = b.form; });
+      saveData(); renderAll(); renderTagManager(); toast('已恢复');
+    }, 5000);
+  }
+  function deleteIdeaTag(tag) {
+    var hidden = data.hiddenTags || (data.hiddenTags = []);
+    var backup = { tag: tag, ideas: [] };
+    (data.inspirations || []).forEach(function (e) {
+      var idx = (e.tags || []).indexOf(tag);
+      if (idx > -1) { backup.ideas.push({ id: e.id }); e.tags.splice(idx, 1); }
+    });
+    var isPreset = IDEA_PRESET_TAGS.indexOf(tag) !== -1;
+    if (isPreset) { if (hidden.indexOf(tag) === -1) hidden.push(tag); }
+    else { var i = (data.ideaTags || []).indexOf(tag); if (i > -1) data.ideaTags.splice(i, 1); }
+    if (state.ideaTag === tag) state.ideaTag = '';
+    saveData(); renderAll(); renderTagManager();
+    toastAction('已删除标签「' + tag + '」' + (backup.ideas.length ? '，' + backup.ideas.length + ' 条灵感已移除该标签' : ''), '撤销', function () {
+      if (isPreset) { var h = data.hiddenTags.indexOf(tag); if (h > -1) data.hiddenTags.splice(h, 1); }
+      else { if ((data.ideaTags || []).indexOf(tag) === -1) (data.ideaTags = data.ideaTags || []).push(tag); }
+      backup.ideas.forEach(function (b) { var e = findIdea(b.id); if (e && (e.tags = e.tags || []).indexOf(tag) === -1) e.tags.push(tag); });
+      saveData(); renderAll(); renderTagManager(); toast('已恢复');
+    }, 5000);
+  }
   document.getElementById('tagFilterWrap').addEventListener('click', function (ev) {
     var chip = ev.target.closest('[data-tag]');
     if (!chip) return;
@@ -1580,9 +1680,39 @@
       document.getElementById('cfgBranch').value = syncCfg.branch || 'main';
       document.getElementById('cfgToken').value = syncCfg.token || '';
     }
+    renderTagManager();
     syncModal.classList.add('show');
   }
   function closeSyncModal() { syncModal.classList.remove('show'); }
+  // 标签管理渲染
+  function recordManageTags() {
+    var list = allTags().slice();
+    data.entries.forEach(function (e) { if (e.tag && list.indexOf(e.tag) === -1) list.push(e.tag); });
+    return list;
+  }
+  function renderTagManager() {
+    var r = document.getElementById('tmRecord');
+    var i = document.getElementById('tmIdea');
+    if (!r || !i) return;
+    var rt = recordManageTags();
+    r.innerHTML = rt.length ? rt.map(function (t) {
+      return '<span class="tm-chip">' + escapeHtml(t) +
+        '<button class="tm-del" data-mgrdel="' + escapeHtml(t) + '" title="删除「' + escapeHtml(t) + '」">×</button></span>';
+    }).join('') : '<span class="tm-empty">暂无记录标签</span>';
+    var it = ideaFilterTags();
+    i.innerHTML = it.length ? it.map(function (t) {
+      return '<span class="tm-chip">' + escapeHtml(t) +
+        '<button class="tm-del" data-mgrideadel="' + escapeHtml(t) + '" title="删除「' + escapeHtml(t) + '」">×</button></span>';
+    }).join('') : '<span class="tm-empty">暂无灵感标签</span>';
+  }
+  document.getElementById('tmRecord').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-mgrdel]');
+    if (b) { ev.stopPropagation(); deleteRecordTag(b.getAttribute('data-mgrdel')); }
+  });
+  document.getElementById('tmIdea').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-mgrideadel]');
+    if (b) { ev.stopPropagation(); deleteIdeaTag(b.getAttribute('data-mgrideadel')); }
+  });
   syncModal.addEventListener('click', function (ev) {
     if (ev.target === syncModal) closeSyncModal();
   });
