@@ -245,6 +245,45 @@
   }
   .qa-notice { display: none; margin-top: 7px; font-size: 12px; color: var(--primary); }
   .qa-notice.show { display: block; }
+  .qa-backfill {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 8px; padding: 2px 4px; border-radius: 4px;
+    font-size: 11px; color: var(--text-3);
+    cursor: pointer; user-select: none; transition: color .15s;
+  }
+  .qa-backfill svg { opacity: .7; }
+  .qa-backfill:hover { color: var(--text-2); }
+  /* 任意日期补录弹窗 */
+  .backfill-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+  .bfm-mask { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+  .bfm-card {
+    position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+    width: min(420px, 92vw); background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.15); padding: 18px;
+  }
+  .bfm-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+  .bfm-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bfm-col { flex: 1; min-width: 140px; }
+  .bfm-label { display: block; font-size: 12.5px; color: var(--text-2); margin-bottom: 4px; }
+  .bfm-input {
+    width: 100%; padding: 7px 9px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 7px; outline: none;
+    transition: border-color .15s; background: var(--card);
+  }
+  .bfm-input:focus { border-color: var(--primary); }
+  .bfm-tags { margin-top: 10px; margin-bottom: 14px; }
+  .bfm-tags-title { font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+  .bfm-tags-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .bfm-tag {
+    font-size: 12px; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--text-2); background: var(--card);
+    cursor: pointer; transition: all .15s;
+  }
+  .bfm-tag.active { color: var(--tag-text); border-color: var(--tag-bg); background: var(--tag-bg); }
+  .bfm-ops { display: flex; gap: 8px; justify-content: flex-end; }
+  .bfm-btn { padding: 7px 16px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border); }
+  .bfm-btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .bfm-btn:not(.primary):hover { border-color: var(--text-3); }
   /* 区块标题（记录 / 灵感分隔） */
   .section-head {
     display: flex; align-items: center; gap: 9px;
@@ -482,6 +521,7 @@
   }
   .idea-op:hover { background: var(--bg); color: var(--primary); }
   .idea-op.del:hover { color: var(--danger); background: #fef2f2; }
+  .idea-op.unrec:hover { color: var(--primary); background: rgba(37,99,235,.08); }
   /* toast（支持操作按钮，如撤销） */
   #toast {
     position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -612,6 +652,9 @@
         </div>
         <div class="qa-foot" id="qaFoot"></div>
         <div class="qa-notice" id="qaNotice">筛选模式已开启：新记录仍会添加到「今天」</div>
+        <div class="qa-backfill" id="btnBackfill">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>补录到某天
+        </div>
       </div>
       <div class="result-banner" id="resultBanner">
         <span id="resultText"></span>
@@ -686,6 +729,29 @@
     <div class="modal-ops">
       <button id="cfgClear">清除配置</button>
       <button id="cfgSave" class="primary">保存并同步</button>
+    </div>
+  </div>
+</div>
+<!-- 任意日期补录弹窗 -->
+<div class="backfill-modal" id="backfillModal" style="display:none;z-index:1000;">
+  <div class="bfm-mask"></div>
+  <div class="bfm-card">
+    <div class="bfm-title">补录到某天</div>
+    <div class="bfm-row">
+      <div class="bfm-col">
+        <span class="bfm-label">日期</span>
+        <input class="bfm-input" id="bfmDate" type="date">
+      </div>
+    </div>
+    <div class="bfm-label">内容</div>
+    <input class="bfm-input" id="bfmText" placeholder="记录一件事…" maxlength="200" style="margin-bottom:0;">
+    <div class="bfm-tags">
+      <div class="bfm-tags-title">标签</div>
+      <div class="bfm-tags-list" id="bfmTagList"></div>
+    </div>
+    <div class="bfm-ops">
+      <button class="bfm-btn" id="bfmCancel">取消</button>
+      <button class="bfm-btn primary" id="bfmSave">保存</button>
     </div>
   </div>
 </div>
@@ -1191,6 +1257,19 @@
     saveData();
     return removed;
   }
+  // 撤回灵感→今日记录的转换：删除关联记录，并把灵感恢复为未转换状态
+  function unrecIdea(ideaId) {
+    var idea = (data.inspirations || []).find(function (e) { return e.id === ideaId; });
+    if (!idea || !idea.converted) return;
+    if (idea.convertedEntryId) {
+      deleteEntry(idea.convertedEntryId);
+      delete idea.convertedEntryId;
+    }
+    idea.converted = false;
+    saveData();
+    renderAll();
+    toast('已撤回，灵感恢复为未转换');
+  }
   /* ================= 应用状态 ================= */
   var state = {
     calY: new Date().getFullYear(),
@@ -1409,7 +1488,10 @@
       var d = new Date(e.createdAt);
       var ds = (d.getMonth() + 1) + '月' + d.getDate() + '日';
       var ops = '<div class="idea-ops">' +
-        (e.converted ? '' :
+        (e.converted ?
+          '<button class="idea-op unrec" data-iact="unrec" data-id="' + e.id + '" title="撤回已转记录">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>' +
+          '</button>' :
           '<button class="idea-op" data-iact="torec" data-id="' + e.id + '" title="转为今日记录"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg></button>') +
         '<button class="idea-op del" data-iact="idel" data-id="' + e.id + '" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
         '</div>';
@@ -1557,6 +1639,54 @@
     });
     row.querySelector('button').addEventListener('click', save);
   }
+  /* ================= 任意日期补录 ================= */
+  var bfmTag = ''; // 补录弹窗当前选中标签
+  var bfmModal = document.getElementById('backfillModal');
+  function openBackfill() {
+    var d = new Date();
+    document.getElementById('bfmDate').value = todayStr();
+    document.getElementById('bfmText').value = '';
+    bfmTag = state.qaTag || '';
+    renderBfmTags();
+    bfmModal.style.display = 'block';
+    setTimeout(function () { document.getElementById('bfmText').focus(); }, 50);
+  }
+  function closeBackfill() { bfmModal.style.display = 'none'; }
+  function renderBfmTags() {
+    var listEl = document.getElementById('bfmTagList');
+    var tags = allTags();
+    var html = '<button class="bfm-tag' + (bfmTag === '' ? ' active' : '') + '" data-tag="">无标签</button>';
+    tags.forEach(function (t) {
+      var on = bfmTag === t;
+      var style = on ? chipStyle(t) : '';
+      html += '<button class="bfm-tag' + (on ? ' active' : '') + '" data-tag="' + escapeHtml(t) + '"' + style + '>' + escapeHtml(t) + '</button>';
+    });
+    listEl.innerHTML = html;
+  }
+  function commitBackfill() {
+    var date = document.getElementById('bfmDate').value;
+    var text = document.getElementById('bfmText').value.trim();
+    if (!date) { toast('请选择日期'); return; }
+    if (!text) { toast('请输入内容'); return; }
+    addEntry(date, text, bfmTag, false);
+    closeBackfill();
+    renderAll();
+    toast('已补录到 ' + dateLabel(date).text);
+  }
+  document.getElementById('btnBackfill').addEventListener('click', openBackfill);
+  bfmModal.addEventListener('click', function (ev) { if (ev.target.classList.contains('bfm-mask')) closeBackfill(); });
+  document.getElementById('bfmCancel').addEventListener('click', closeBackfill);
+  document.getElementById('bfmSave').addEventListener('click', commitBackfill);
+  document.getElementById('bfmTagList').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-tag]');
+    if (!b) return;
+    bfmTag = b.getAttribute('data-tag');
+    renderBfmTags();
+  });
+  document.getElementById('bfmText').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); commitBackfill(); }
+    else if (ev.key === 'Escape') closeBackfill();
+  });
   /* ================= 事件：快速添加 ================= */
   var qaText = document.getElementById('qaText');
   function quickAdd() {
@@ -1838,14 +1968,14 @@
     } else if (act === 'torec') {
       if (!idea || idea.converted) return;
       var created = addEntry(todayStr(), idea.text, '', false); // 标签体系已分开，转记录不再自动打标
-      updateIdea(id, { converted: true }); // 标记已转换，防止重复转换
+      updateIdea(id, { converted: true, convertedEntryId: created.id }); // 标记已转换，并记录关联的记录id
       renderAll();
       toastAction('已转为今日记录', '撤销', function () {
-        updateIdea(id, { converted: false });
-        deleteEntry(created.id);
-        renderAll();
+        unrecIdea(id);
         toast('已撤销');
       }, 5000);
+    } else if (act === 'unrec') {
+      unrecIdea(id);
     }
   });
   /* ================= 事件：云端同步设置 ================= */
