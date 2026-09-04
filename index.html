@@ -491,6 +491,22 @@
     flex: 1; border: none; outline: none; font-size: 14px;
     border-bottom: 1.5px solid var(--primary); padding: 1px 0; background: none;
   }
+  .entry.editting { flex-wrap: wrap; row-gap: 4px; }
+  .entry.editting .edit-input { flex: 1 1 70%; }
+  .entry.editting .edit-tags { flex: 1 1 100%; margin-top: 2px; }
+  .edit-tags {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px;
+  }
+  .edit-tag {
+    font-size: 11.5px; padding: 1.5px 9px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--text-2);
+    background: var(--card); cursor: pointer; transition: all .15s;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .edit-tag:hover { border-color: var(--primary); color: var(--primary); }
+  .edit-tag.on { font-weight: 600; }
+  .edit-tags-empty { font-size: 11.5px; color: var(--text-3); }
+  .idea-card.editting .edit-input { width: 100%; }
   .add-more {
     display: flex; align-items: center; gap: 5px;
     padding: 7px 12px; font-size: 12.5px; color: var(--text-3);
@@ -1525,6 +1541,8 @@
     filterStatus: 'all',   // all | todo | done | star
     editingId: null,
     editingIdeaId: null,
+    editTag: '',          // 记录编辑态的当前选中标签
+    editIdeaSel: [],      // 灵感编辑态的标签多选
     ideaTag: '',           // 灵感视图的标签筛选
     qaTag: '',
     qaStar: false
@@ -1613,8 +1631,9 @@
     var del = '<button class="entry-del" data-act="del" data-id="' + e.id + '" title="删除">' +
       '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
     if (state.editingId === e.id) {
-      return '<div class="entry">' +
+      return '<div class="entry editting">' +
         '<input class="edit-input" id="edit-' + e.id + '" value="' + escapeHtml(e.text) + '" maxlength="200">' +
+        '<div class="edit-tags">' + renderEditTagSel(state.editTag) + '</div>' +
         star + del + '</div>';
     }
     return '<div class="entry">' +
@@ -1681,10 +1700,25 @@
   function commitEdit(id, val) {
     val = val.trim();
     state.editingId = null;
-    // 清空不再视为删除，避免误触丢数据；内容有变化才保存
     var e = findEntry(id);
-    if (e && val && val !== e.text) updateEntry(id, { text: val });
+    if (e) {
+      var patch = {};
+      if (val && val !== e.text) patch.text = val;
+      var nt = state.editTag || '';
+      if (nt !== (e.tag || '')) patch.tag = nt;
+      if (Object.keys(patch).length) updateEntry(id, patch);
+    }
+    state.editTag = '';
     renderAll();
+  }
+  function renderEditTagSel(cur) { // 记录编辑态：单选标签
+    var html = '<button class="edit-tag chip' + (cur === '' ? ' on' : '') + '" data-etag=""' +
+      (cur === '' ? ' style="color:#fff;background:#64748b;border-color:#64748b"' : '') + '>无标签</button>';
+    allTags().forEach(function (t) {
+      var on = t === cur;
+      html += '<button class="edit-tag chip' + (on ? ' on' : '') + '" data-etag="' + escapeHtml(t) + '"' + (on ? chipStyle(t, true) : chipStyle(t, false)) + '><i class="tdot"></i>' + escapeHtml(t) + '</button>';
+    });
+    return html;
   }
   /* ================= 渲染：灵感板块 ================= */
   function ideaFilterTags() {
@@ -1740,6 +1774,7 @@
       if (state.editingIdeaId === e.id) {
         html += '<div class="idea-card">' +
           '<input class="edit-input" id="iedit-' + e.id + '" value="' + escapeHtml(e.text) + '" maxlength="500">' +
+          '<div class="edit-tags">' + renderIdeaEditSel() + '</div>' +
           '<div class="idea-foot"><span class="idea-date" style="margin-left:0;">' + ds + '</span></div></div>';
       } else {
         var tagsHtml = (e.tags || []).map(function (t) { return tagBadge(t); }).join('');
@@ -1769,11 +1804,27 @@
   function commitIdeaEdit(id, val) {
     val = val.trim();
     state.editingIdeaId = null;
-    // 清空不再视为删除，恢复原内容
     var idea = null;
     (data.inspirations || []).forEach(function (e) { if (e.id === id) idea = e; });
-    if (idea && val && val !== idea.text) updateIdea(id, { text: val });
+    if (idea) {
+      var patch = {};
+      if (val && val !== idea.text) patch.text = val;
+      var tags = (state.editIdeaSel || []).slice();
+      if (JSON.stringify(tags) !== JSON.stringify(idea.tags || [])) patch.tags = tags;
+      if (Object.keys(patch).length) updateIdea(id, patch);
+    }
+    state.editIdeaSel = [];
     renderAll();
+  }
+  function renderIdeaEditSel() { // 灵感编辑态：多选标签（点取消）
+    var sel = state.editIdeaSel || [];
+    var html = '';
+    ideaFilterTags().forEach(function (t) {
+      var on = sel.indexOf(t) > -1;
+      html += '<button class="edit-tag chip' + (on ? ' on' : '') + '" data-ietag="' + escapeHtml(t) + '"' +
+        (on ? chipStyle(t, true) : chipStyle(t, false)) + '><i class="tdot"></i>' + escapeHtml(t) + '</button>';
+    });
+    return html || '<span class="edit-tags-empty">无可用标签</span>';
   }
   /* ================= 渲染：快速添加 & 结果横幅 ================= */
   function renderQuickAdd() {
@@ -1958,7 +2009,9 @@
         }, 5000);
       }
     } else if (act === 'edit') {
+      var _ee = findEntry(id);
       state.editingId = id;
+      state.editTag = _ee ? (_ee.tag || '') : '';
       renderTimeline();
     } else if (act === 'addmore') {
       handleAddMore(el.getAttribute('data-date'));
@@ -1968,6 +2021,20 @@
     for (var i = 0; i < data.entries.length; i++) if (data.entries[i].id === id) return data.entries[i];
     return null;
   }
+  // 记录编辑态：选标签（需阻止输入框失焦，避免提前提交）
+  document.getElementById('timeline').addEventListener('pointerdown', function (ev) {
+    if (ev.target.closest('[data-etag]')) ev.preventDefault();
+  });
+  document.getElementById('timeline').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-etag]');
+    if (!b) return;
+    state.editTag = b.getAttribute('data-etag');
+    ev.preventDefault();
+    var inp = document.getElementById('edit-' + state.editingId);
+    var pos = inp ? inp.value.length : 0;
+    renderTimeline();
+    if (inp) { var f = document.getElementById('edit-' + state.editingId); if (f) f.setSelectionRange(pos, pos); }
+  });
   var addingDate = null; // 补录目标日期
   function handleAddMore(date) {
     addingDate = date;
@@ -2309,6 +2376,23 @@
     renderIdeaTagBar();
     renderIdeas();
   });
+  // 灵感编辑态：选标签（阻止输入框失焦提前提交）
+  document.getElementById('ideaGrid').addEventListener('pointerdown', function (ev) {
+    if (ev.target.closest('[data-ietag]')) ev.preventDefault();
+  });
+  document.getElementById('ideaGrid').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-ietag]');
+    if (!b) return;
+    var t = b.getAttribute('data-ietag');
+    if (!t) return;
+    var sel = state.editIdeaSel = state.editIdeaSel || [];
+    var i = sel.indexOf(t);
+    if (i > -1) sel.splice(i, 1); else sel.push(t);
+    ev.preventDefault();
+    var inp = document.getElementById('iedit-' + state.editingIdeaId);
+    if (inp && inp.focus) inp.focus();
+    renderIdeas();
+  });
   document.getElementById('ideaGrid').addEventListener('click', function (ev) {
     var el = ev.target.closest('[data-iact]');
     if (!el) return;
@@ -2317,6 +2401,7 @@
     var idea = (data.inspirations || []).find(function (e) { return e.id === id; });
     if (act === 'iedit') {
       state.editingIdeaId = id;
+      state.editIdeaSel = (idea && idea.tags) ? idea.tags.slice() : [];
       renderIdeas();
     } else if (act === 'idel') {
       var removed = deleteIdea(id);
